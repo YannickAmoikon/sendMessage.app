@@ -1,11 +1,11 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 const getAuthToken = () => {
-    return localStorage.getItem('accessToken');
+    return localStorage.getItem('token');
 };
 
 const baseQuery = fetchBaseQuery({
-    baseUrl: 'https://api-sacirba.sanlamconnect.com/api/v1',
+    baseUrl: 'https://service-mairie.merute.dev/',
     prepareHeaders: (headers) => {
         const token = getAuthToken();
         if (token) {
@@ -19,7 +19,7 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
     let result = await baseQuery(args, api, extraOptions);
 
     if (result?.error?.status === 401 || result?.error?.status === 403) {
-        localStorage.removeItem('accessToken');
+        localStorage.removeItem('token');
         window.location.href = '/login';
     }
 

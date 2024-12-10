@@ -7,7 +7,7 @@ export const authApi = api.injectEndpoints({
             { email: string; password: string }
         >({
             query: (credentials) => ({
-                url: '/auth/login',
+                url: '/user/login',
                 method: 'POST',
                 body: credentials,
             }),

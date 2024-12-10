@@ -1,6 +1,5 @@
 "use client"
 
-import type {Metadata} from "next";
 import localFont from "next/font/local";
 import "../styles/globals.css";
 import {ReactNode} from "react";
