@@ -18,7 +18,9 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {Download, SendHorizontal} from "lucide-react";
+import {Download, FileUp, SendHorizontal} from "lucide-react";
+import {ChangeEvent, useState} from "react";
+import {Label} from "@/components/ui/label";
 
 const formSchema = z.object({
     contacts: z.string().min(2, {
@@ -30,7 +32,16 @@ const formSchema = z.object({
 });
 
 export default function SendPage() {
-    const form = useForm<z.infer<typeof formSchema>>({
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+    const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files?.[0]) {
+            setSelectedFile(e.target.files[0]);
+            console.log(e.target.files[0]); // Temporairement log le fichier sélectionné
+        }
+    }
+
+        const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
             contacts: "",
@@ -54,18 +65,35 @@ export default function SendPage() {
                     <div className="py-8 md:py-16 mx-auto flex flex-col md:h-auto w-full md:max-w-4xl">
                         <div className="border-2 p-4 md:p-8 flex flex-col rounded-md w-full space-y-8">
                             <div className="flex justify-end">
-                                <Button size="sm" className="bg-gray-500 hover:duration-500 hover:scale-105 hover:bg-gray-600 duration-500 hover:shadow-md"> <Download className="mr-1" />Importer des contacts</Button>
+                                <div className="flex items-center space-x-2 rounded-md">
+                                    <Input
+                                        id="file-upload"
+                                        type="file"
+                                        accept=".xlsx, .xls"
+                                        className="hidden"
+                                        onChange={handleFileChange}
+                                    />
+                                    <Label
+                                        htmlFor="file-upload"
+                                        className=" bg-gray-500 border px-3 py-1.5 rounded-md text-gray-700 font-medium hover:bg-gray-600 cursor-pointer transition-colors"
+                                    >
+                                        <div className="flex items-center text-white space-x-2">
+                                            <Download size={18} className="mr-1"/>
+                                            <span className="text-sm ">{selectedFile ? selectedFile.name : "Importer contacts"}</span>
+                                        </div>
+                                    </Label>
+                                </div>
                             </div>
                             <Form {...form}>
                                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 md:space-y-8">
                                     <FormField
                                         control={form.control}
                                         name="contacts"
-                                        render={({ field }) => (
+                                        render={({field}) => (
                                             <FormItem>
                                                 <FormLabel>Contacts</FormLabel>
                                                 <FormControl>
-                                                    <Input className="h-10" placeholder="Entrez les numéros de contact..." {...field} />
+                                                <Input className="h-10" placeholder="Entrez les numéros de contact..." {...field} />
                                                 </FormControl>
                                                 <FormDescription>
                                                     Séparez les numéros par des virgules.
