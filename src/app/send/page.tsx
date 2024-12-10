@@ -17,6 +17,7 @@ import {
     CardDescription,
     CardContent,
 } from "@/components/ui/card";
+import * as XLSX from "xlsx";
 
 export default function SendPage() {
     const [sendMessage, { isLoading }] = useMessageMutation();
@@ -29,24 +30,24 @@ export default function SendPage() {
     const [phoneInput, setPhoneInput] = useState("");
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-    /** Gérer l'ajout de numéros de téléphone */
     const handlePhoneInput = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === ',' || e.key === 'Enter') {
+        if (e.key === "," || e.key === "Enter") {
             e.preventDefault();
             const newPhone = phoneInput.trim();
-
             if (newPhone) {
-                // Vérifier le format du numéro
                 const phoneRegex = /^\d{10}$/;
                 if (phoneRegex.test(newPhone)) {
-                    // Ajouter le numéro s'il n'existe pas déjà
-                    setFormData(prev => ({
-                        ...prev,
-                        phones: prev.phones.includes(newPhone)
+                    setFormData((prev) => {
+                        const updatedPhones = prev.phones.includes(newPhone)
                             ? prev.phones
-                            : [...prev.phones, newPhone]
-                    }));
-                    setPhoneInput(""); // Réinitialiser l'input
+                            : [...prev.phones, newPhone];
+                        console.log("Numéros enregistrés (depuis saisie):", updatedPhones);
+                        return {
+                            ...prev,
+                            phones: updatedPhones,
+                        };
+                    });
+                    setPhoneInput("");
                 } else {
                     toast({
                         title: "Numéro invalide",
@@ -58,15 +59,13 @@ export default function SendPage() {
         }
     };
 
-    /** Supprimer un numéro de téléphone */
     const removePhone = (phoneToRemove: string) => {
-        setFormData(prev => ({
+        setFormData((prev) => ({
             ...prev,
-            phones: prev.phones.filter(phone => phone !== phoneToRemove)
+            phones: prev.phones.filter((phone) => phone !== phoneToRemove),
         }));
     };
 
-    /** Gérer les changements de champs du formulaire */
     const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormData((prev) => ({
@@ -75,22 +74,90 @@ export default function SendPage() {
         }));
     };
 
-    /** Gérer l'import de fichier */
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files?.[0]) {
             const file = e.target.files[0];
-            setSelectedFile(file);
-            toast({
-                title: "Fichier importé",
-                description: `Fichier sélectionné : ${file.name}`,
-                className: "bg-green-600 text-white",
-            });
+            setSelectedFile(file); // Stocke temporairement le fichier sélectionné dans l'état
+    
+            const reader = new FileReader(); // Instancie le lecteur pour lire le fichier
+            reader.onload = (event) => {
+                const data = new Uint8Array(event.target?.result as ArrayBuffer); // Convertit le fichier en tableau d'octets
+                const workbook = XLSX.read(data, { type: "array" }); // Lit le fichier Excel
+                const firstSheetName = workbook.SheetNames[0]; // Récupère le nom de la première feuille Excel
+                const sheet = workbook.Sheets[firstSheetName]; // Accède au contenu de cette feuille
+    
+                // Convertit les données de la feuille Excel en JSON
+                const rows = XLSX.utils.sheet_to_json(sheet, { raw: false });
+    
+                // Nom de la colonne à rechercher, si connu
+                const columnsToExtract = ["Téléphone", "Numéro", "Contact"]; // Liste des colonnes spécifiques, selon votre fichier Excel
+    
+                // Liste des numéros de téléphone extraits
+                const extractedPhones: string[] = [];
+    
+                rows.forEach((row: any) => {
+                    // Vérifie si les colonnes cibles existent dans la ligne
+                    columnsToExtract.forEach((col) => {
+                        if (row[col]) {
+                            let phone = row[col].toString().trim(); // Convertit la valeur trouvée en chaîne
+                            if (/^\d{9}$/.test(phone)) {
+                                phone = "0" + phone; // Ajoute zéro si le numéro fait 9 chiffres
+                            }
+                            if (/^\d{10}$/.test(phone)) {
+                                extractedPhones.push(phone); // Ajoute à la liste si le numéro est valide
+                            }
+                        }
+                    });
+    
+                    // Si vous voulez travailler avec toutes les colonnes :
+                    Object.values(row).forEach((value) => {
+                        let phone = value?.toString().trim(); // Convertir la valeur en texte
+                        //@ts-ignore
+                        if (/^\d{9}$/.test(phone)) {
+                            phone = "0" + phone; // Ajoute zéro si nécessaire
+                        }
+                        //@ts-ignore
+                        if (/^\d{10}$/.test(phone)) {
+                            //@ts-ignore
+                            extractedPhones.push(phone); // Ajoute à la liste des numéros valides
+                        }
+                    });
+                });
+    
+                console.log("Numéros extraits depuis le fichier Excel:", extractedPhones);
+    
+                // Met à jour l'état avec les numéros extraits
+                setFormData((prev) => {
+                    const updatedPhones = Array.from(new Set([...prev.phones, ...extractedPhones]));
+                    console.log("Numéros enregistrés (après import):", updatedPhones);
+                    return {
+                        ...prev,
+                        phones: updatedPhones,
+                    };
+                });
+    
+                // Notification pour informer de l'importation réussie
+                toast({
+                    title: "Fichier importé avec succès",
+                    description: `${extractedPhones.length} numéros valides ont été ajoutés.`,
+                    className: "bg-green-600 text-white",
+                });
+            };
+    
+            // Gestion des erreurs lors de la lecture de fichier
+            reader.onerror = () => {
+                toast({
+                    title: "Erreur",
+                    description: "Le fichier n'a pas pu être lu. Veuillez réessayer.",
+                    variant: "destructive",
+                });
+            };
+    
+            reader.readAsArrayBuffer(file); // Lis le fichier comme un tableau d'octets
         }
     };
 
-    /** Valider les champs du formulaire */
     const validateFields = () => {
-        // Validation des numéros de téléphone
         if (formData.phones.length === 0) {
             toast({
                 title: "Validation échouée",
@@ -100,7 +167,6 @@ export default function SendPage() {
             return false;
         }
 
-        // Validation du corps du message
         if (!formData.body) {
             toast({
                 title: "Validation échouée",
@@ -113,7 +179,6 @@ export default function SendPage() {
         return true;
     };
 
-    /** Soumettre le formulaire */
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -131,7 +196,6 @@ export default function SendPage() {
                 className: "bg-green-600 text-white",
             });
 
-            // Réinitialiser le formulaire
             setFormData({
                 phones: [],
                 body: "",
@@ -172,7 +236,7 @@ export default function SendPage() {
                                             id="file-upload"
                                             type="file"
                                             accept=".xlsx, .xls"
-                                            className="hidden"
+                                            className="hidden py-1"
                                             onChange={handleFileChange}
                                         />
                                         <Label
@@ -181,10 +245,10 @@ export default function SendPage() {
                                         >
                                             <div className="flex items-center text-white space-x-2">
                                                 <Download size={18} className="mr-1" />
-                                                <span className="text-sm">
+                                                <span>
                                                     {selectedFile
                                                         ? selectedFile.name
-                                                        : "Importer téléphones"}
+                                                        : "Importer Contacts"}
                                                 </span>
                                             </div>
                                         </Label>
@@ -196,11 +260,11 @@ export default function SendPage() {
                                     className="space-y-6 md:space-y-8"
                                 >
                                     <div>
-                                        <Label htmlFor="phones">Téléphones</Label>
+                                        <Label className="font-normal" htmlFor="phones">Téléphones</Label>
                                         <div className="space-y-2">
                                             <Input
                                                 id="phones"
-                                                placeholder="Entrez les numéros (10 chiffres), séparés par une virgule ou Entrée..."
+                                                placeholder="Ex: 0750000000, 0750000001, 0750000002"
                                                 value={phoneInput}
                                                 onChange={(e) => setPhoneInput(e.target.value)}
                                                 onKeyDown={handlePhoneInput}
@@ -208,7 +272,7 @@ export default function SendPage() {
                                             />
                                             {formData.phones.length > 0 && (
                                                 <div className="flex flex-wrap gap-2">
-                                                    {formData.phones.map(phone => (
+                                                    {formData.phones.map((phone) => (
                                                         <div
                                                             key={phone}
                                                             className="bg-white border text-gray-800 px-2 py-0.5 rounded-md flex items-center space-x-3 rounded-sm"
