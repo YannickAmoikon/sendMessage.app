@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLoginMutation } from "@/services/auth.service";
-import { Loader } from "lucide-react";
+import { Loader, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -20,6 +20,8 @@ export default function LoginForm() {
         email: "",
         password: "",
     });
+
+    const [showPassword, setShowPassword] = useState(false);
 
     /** Gérer les champs du formulaire */
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -39,7 +41,6 @@ export default function LoginForm() {
                 description: "Tous les champs sont requis.",
                 variant: "destructive",
             });
-            console.log("Toast appelé : Validation échouée");
             return false;
         }
         if (!emailRegex.test(formData.email)) {
@@ -48,7 +49,6 @@ export default function LoginForm() {
                 description: "Veuillez entrer une adresse email valide.",
                 variant: "destructive",
             });
-            console.log("Toast appelé : Email invalide");
             return false;
         }
         return true;
@@ -75,7 +75,6 @@ export default function LoginForm() {
                 description: "Bienvenue ! Vous allez être redirigé.",
                 className: "bg-green-600 text-white",
             });
-            console.log("Toast appelé : Connexion réussie");
 
             setTimeout(() => {
                 router.push("/send");
@@ -91,14 +90,12 @@ export default function LoginForm() {
                     description: "Veuillez vérifier vos informations.",
                     variant: "destructive",
                 });
-                console.log("Toast appelé : Identifiants incorrects");
             } else if (status === 500) {
                 toast({
                     title: "Erreur serveur",
                     description: "Une erreur est survenue.",
                     variant: "destructive",
                 });
-                console.log("Toast appelé : Erreur serveur");
             }
         }
     };
@@ -136,15 +133,28 @@ export default function LoginForm() {
                             </div>
                             <div>
                                 <Label htmlFor="password">Mot de passe</Label>
-                                <Input
-                                    id="password"
-                                    name="password"
-                                    type="password"
-                                    placeholder="********"
-                                    required
-                                    value={formData.password}
-                                    onChange={handleInputChange}
-                                />
+                                <div className="relative">
+                                    <Input
+                                        id="password"
+                                        name="password"
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="********"
+                                        required
+                                        value={formData.password}
+                                        onChange={handleInputChange}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="absolute right-2 top-2 focus:outline-none"
+                                        onClick={() => setShowPassword((prev) => !prev)}
+                                    >
+                                        {showPassword ? (
+                                            <EyeOff className="text-gray-500" size={20} />
+                                        ) : (
+                                            <Eye className="text-gray-500" size={20} />
+                                        )}
+                                    </button>
+                                </div>
                             </div>
                             <Button
                                 size="sm"

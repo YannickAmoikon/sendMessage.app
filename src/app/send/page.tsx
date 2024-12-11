@@ -7,8 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useMessageMutation } from "@/services/message.service";
 import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
 import { Toaster } from "@/components/ui/toaster";
-import { SendHorizontal, Download, X } from "lucide-react";
+import { SendHorizontal, Download, X, LogOut } from "lucide-react";
 import ProtectedRoad from "@/components/app/roads/ProtectedRoad";
 import {
     Card,
@@ -18,10 +19,22 @@ import {
     CardContent,
 } from "@/components/ui/card";
 import * as XLSX from "xlsx";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function SendPage() {
     const [sendMessage, { isLoading }] = useMessageMutation();
     const { toast } = useToast();
+    const router = useRouter();
 
     const [formData, setFormData] = useState({
         phones: [] as string[],
@@ -77,74 +90,50 @@ export default function SendPage() {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files?.[0]) {
             const file = e.target.files[0];
-            setSelectedFile(file); // Stocke temporairement le fichier sélectionné dans l'état
-    
-            const reader = new FileReader(); // Instancie le lecteur pour lire le fichier
+            setSelectedFile(file);
+
+            const reader = new FileReader();
             reader.onload = (event) => {
-                const data = new Uint8Array(event.target?.result as ArrayBuffer); // Convertit le fichier en tableau d'octets
-                const workbook = XLSX.read(data, { type: "array" }); // Lit le fichier Excel
-                const firstSheetName = workbook.SheetNames[0]; // Récupère le nom de la première feuille Excel
-                const sheet = workbook.Sheets[firstSheetName]; // Accède au contenu de cette feuille
-    
-                // Convertit les données de la feuille Excel en JSON
+                const data = new Uint8Array(event.target?.result as ArrayBuffer);
+                const workbook = XLSX.read(data, { type: "array" });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
                 const rows = XLSX.utils.sheet_to_json(sheet, { raw: false });
-    
-                // Nom de la colonne à rechercher, si connu
-                const columnsToExtract = ["Téléphone", "Numéro", "Contact"]; // Liste des colonnes spécifiques, selon votre fichier Excel
-    
-                // Liste des numéros de téléphone extraits
+                const columnsToExtract = ["Téléphone", "Numéro", "Contact"];
                 const extractedPhones: string[] = [];
-    
+
                 rows.forEach((row: any) => {
-                    // Vérifie si les colonnes cibles existent dans la ligne
                     columnsToExtract.forEach((col) => {
                         if (row[col]) {
-                            let phone = row[col].toString().trim(); // Convertit la valeur trouvée en chaîne
-                            if (/^\d{9}$/.test(phone)) {
-                                phone = "0" + phone; // Ajoute zéro si le numéro fait 9 chiffres
-                            }
-                            if (/^\d{10}$/.test(phone)) {
-                                extractedPhones.push(phone); // Ajoute à la liste si le numéro est valide
-                            }
+                            let phone = row[col].toString().trim();
+                            if (/^\d{9}$/.test(phone)) phone = "0" + phone;
+                            if (/^\d{10}$/.test(phone)) extractedPhones.push(phone);
                         }
                     });
-    
-                    // Si vous voulez travailler avec toutes les colonnes :
+
                     Object.values(row).forEach((value) => {
-                        let phone = value?.toString().trim(); // Convertir la valeur en texte
+                        let phone = value?.toString().trim();
                         //@ts-ignore
-                        if (/^\d{9}$/.test(phone)) {
-                            phone = "0" + phone; // Ajoute zéro si nécessaire
-                        }
+                        if (/^\d{9}$/.test(phone)) phone = "0" + phone;
                         //@ts-ignore
-                        if (/^\d{10}$/.test(phone)) {
-                            //@ts-ignore
-                            extractedPhones.push(phone); // Ajoute à la liste des numéros valides
-                        }
+                        if (/^\d{10}$/.test(phone)) extractedPhones.push(phone);
                     });
                 });
-    
+
                 console.log("Numéros extraits depuis le fichier Excel:", extractedPhones);
-    
-                // Met à jour l'état avec les numéros extraits
-                setFormData((prev) => {
-                    const updatedPhones = Array.from(new Set([...prev.phones, ...extractedPhones]));
-                    console.log("Numéros enregistrés (après import):", updatedPhones);
-                    return {
-                        ...prev,
-                        phones: updatedPhones,
-                    };
-                });
-    
-                // Notification pour informer de l'importation réussie
+
+                setFormData((prev) => ({
+                    ...prev,
+                    phones: Array.from(new Set([...prev.phones, ...extractedPhones])),
+                }));
+
                 toast({
                     title: "Fichier importé avec succès",
                     description: `${extractedPhones.length} numéros valides ont été ajoutés.`,
                     className: "bg-green-600 text-white",
                 });
             };
-    
-            // Gestion des erreurs lors de la lecture de fichier
+
             reader.onerror = () => {
                 toast({
                     title: "Erreur",
@@ -152,8 +141,8 @@ export default function SendPage() {
                     variant: "destructive",
                 });
             };
-    
-            reader.readAsArrayBuffer(file); // Lis le fichier comme un tableau d'octets
+
+            reader.readAsArrayBuffer(file);
         }
     };
 
@@ -196,10 +185,7 @@ export default function SendPage() {
                 className: "bg-green-600 text-white",
             });
 
-            setFormData({
-                phones: [],
-                body: "",
-            });
+            setFormData({ phones: [], body: "" });
             setPhoneInput("");
             setSelectedFile(null);
         } catch (error) {
@@ -207,6 +193,25 @@ export default function SendPage() {
             toast({
                 title: "Erreur",
                 description: "Impossible d'envoyer le message, veuillez réessayer.",
+                variant: "destructive",
+            });
+        }
+    };
+
+    const handleLogout = () => {
+        try {
+            localStorage.removeItem("token");
+            router.push("/login");
+            toast({
+                title: "Déconnexion réussie",
+                description: "Vous avez été déconnecté avec succès.",
+                className: "bg-green-600 text-white",
+            });
+        } catch (error) {
+            console.error("Erreur lors de la déconnexion :", error);
+            toast({
+                title: "Erreur",
+                description: "Une erreur est survenue lors de la déconnexion.",
                 variant: "destructive",
             });
         }
@@ -224,6 +229,33 @@ export default function SendPage() {
                                 <CardDescription>
                                     {"Gérez l'envoi de vos messages."}
                                 </CardDescription>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button size="icon" variant="outline" aria-label="Déconnexion">
+                                            <LogOut size={18}/>
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Etes-vous sûr de vouloir vous déconnecter
+                                                ?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                Cette action est irréversible.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                            <AlertDialogAction
+                                                className="bg-red-600 hover:bg-red-700"
+                                                onClick={handleLogout}
+                                            >
+                                                Déconnexion
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
                             </div>
                         </div>
                     </CardHeader>
